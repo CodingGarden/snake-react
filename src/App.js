@@ -37,51 +37,62 @@ class App extends Component {
   }
 
   componentDidMount = () => {
+    document.addEventListener('keydown', (e) => {
+      this.setVelocity(e);
+    });
+
     setTimeout(() => {
       this.gameLoop()
-    }, 1000);
+    }, this.state.snake.tail.length ? (400 / this.state.snake.tail.length) + 200 : 400);
+  }
+
+  getRandomApple = () => {
+    const { snake } = this.state;
+    const newApple = {
+      row: Math.floor(Math.random() * 20),
+      col: Math.floor(Math.random() * 20),
+    };
+    if (this.isTail(newApple) || (
+      snake.head.row === newApple.row
+      && snake.head.col === newApple.col)) {
+      return this.getRandomApple();
+    } else {
+      return newApple;
+    }
   }
 
   gameLoop = () => {
     if (this.state.gameOver) return;
 
-    this.setState((prevState) => ({
-      snake: {
-        head: {
-          row: prevState.snake.row + prevState.snake.velocity.x,
-          col: prevState.snake.col + prevState.snake.velocity.y
+    this.setState(({snake, apple}) => {
+      const collidesWithApple = this.collidesWithApple();
+      const nextState = {
+        snake: {
+          ...snake,
+          head: {
+            row: snake.head.row + snake.velocity.y,
+            col: snake.head.col + snake.velocity.x
+          },
+          tail: [snake.head, ...snake.tail]
         },
-        tail: prevState.snake.tail.map(cell => ({
-          row: cell.row + prevState.snake.velocity.x,
-          col: cell.col + prevState.snake.velocity.y
-        }))
-      }
-    }), () => {
-      if (this.isOffEdge()) {
+        apple: collidesWithApple ? this.getRandomApple() : apple
+      };
+
+      if (!collidesWithApple) nextState.snake.tail.pop();
+
+      return nextState;
+    }, () => {
+      const { snake } = this.state;
+      if (this.isOffEdge() || this.isTail(snake.head)) {
         this.setState({
           gameOver: true,
         });
         return;
       }
-
-      if (this.collidesWithApple()) {
-        this.setState(({tail, head}) => {
-          tail.pop();
-          return {
-            snake: {
-              tail: [head, ...tail],
-            },
-            apple: {
-              row: Math.floor(Math.random() * 20),
-              col: Math.floor(Math.random() * 20),
-            }
-          }
-        });
-      }
   
       setTimeout(() => {
         this.gameLoop()
-      }, 1000);
+      }, this.state.snake.tail.length ? (400 / this.state.snake.tail.length) + 200 : 400);
     });
   }
 
@@ -120,27 +131,34 @@ class App extends Component {
   }
 
   setVelocity = (event) => {
+    const { snake } = this.state;
     if (event.keyCode === 38) { // up
-      this.setState((prevState) => ({
+      if (snake.velocity.y === 1) return;
+      this.setState(({snake}) => ({
         snake: {
-          velocity: {
-            x: 0,
-            y: 1,
-          }
-        }
-      }))
-    } else if (event.keyCode === 40) {// down 
-      this.setState((prevState) => ({
-        snake: {
+          ...snake,
           velocity: {
             x: 0,
             y: -1,
           }
         }
       }))
-    } else if (event.keyCode === 39)  {//right
-      this.setState((prevState) => ({
+    } else if (event.keyCode === 40) {// down 
+      if (snake.velocity.y === -1) return;
+      this.setState(({snake}) => ({
         snake: {
+          ...snake,
+          velocity: {
+            x: 0,
+            y: 1,
+          }
+        }
+      }))
+    } else if (event.keyCode === 39)  {//right
+      if (snake.velocity.x === -1) return;
+      this.setState(({snake}) => ({
+        snake: {
+          ...snake,
           velocity: {
             x: 1,
             y: 0,
@@ -148,8 +166,10 @@ class App extends Component {
         }
       }))
     } else if (event.keyCode === 37)  { // left
-      this.setState((prevState) => ({
+      if (snake.velocity.x === 1) return;
+      this.setState(({snake}) => ({
         snake: {
+          ...snake,
           velocity: {
             x: -1,
             y: 0,
@@ -162,25 +182,25 @@ class App extends Component {
   render() {
     const { grid, snake, gameOver } = this.state;
     return (
-      <div onKeyDown={this.setVelocity} className="App">
+      <div className="App">
         {
           gameOver
           ? <h1>Game Over! You scored {snake.tail.length + 1}!</h1>
           : <section className="grid">
         {
-          grid.map((row, i) => {
+          grid.map((row, i) => (
             row.map(cell => (
-              <div className={`cell
+              <div key={`${cell.row} ${cell.col}`} className={`cell
                 ${
-                  this.isApple(cell)
-                  ? 'apple' : this.isHead(cell)
-                  ? 'head' : this.isTail(cell)
+                  this.isHead(cell)
+                  ? 'head' : this.isApple(cell)
+                  ? 'apple' : this.isTail(cell)
                   ? 'tail' : ''
                   }`
                 }>
               </div>
             ))
-          })
+          ))
         }
         </section>
         }
